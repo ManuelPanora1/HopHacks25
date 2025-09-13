@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Stock Market Hologram - Live Data & Sentiment</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="title">MARKET SENTIMENT HOLOGRAM</div>
+    
+    <div id="controls">
+        <div>🖱️ Move mouse to rotate</div>
+        <div>🖱️ Click to toggle auto-rotation</div>
+        <div>📊 Hover for detailed analysis</div>
+        <div>🔄 Auto-updating every 10s</div>
+    </div>
+
+    <div id="marketHealth">
+        <div id="overallSentiment">Market Sentiment: <span id="sentimentValue">NEUTRAL</span></div>
+        <div style="font-size: 12px; margin-top: 5px;">Risk Level: <span id="riskLevel">MODERATE</span></div>
+    </div>
+
+    <div id="dataPanel">
+        <div style="font-weight: bold; margin-bottom: 8px;">📈 Live Market Data</div>
+        <div id="marketStats"></div>
+        <div style="font-weight: bold; margin: 10px 0 5px 0;">🔍 Recent Analysis</div>
+        <div id="sentimentFeed" style="max-height: 120px; overflow-y: auto;"></div>
+    </div>
+    
+    <div id="tooltip"></div>
+
+    <!-- Stock Selection Panel -->
+    <div id="stockPanel">
+        <div class="panel-header">📊 STOCK SELECTOR</div>
+    
+        <div class="section-title">Active Stocks</div>
+        <div id="stockList"></div>
+    
+        <div class="add-stock-section">
+            <div class="section-title">Add New Stock</div>
+            <input type="text" id="newStockSymbol" class="add-stock-input" placeholder="Enter stock symbol (e.g., AAPL)" maxlength="5">
+            <button id="addStockBtn" class="add-stock-btn">Add to Visualization</button>
+            <div style="font-size: 11px; color: rgba(0,255,255,0.6); margin-top: 10px; line-height: 1.4;">
+                Note: New stocks will have simulated data for demonstration purposes.
+            </div>
+        </div>
+
+        <div class="add-stock-section">
+            <div class="section-title">Panel Controls</div>
+            <button id="selectAllBtn" class="add-stock-btn" style="margin-bottom: 10px;">Select All Stocks</button>
+            <button id="deselectAllBtn" class="add-stock-btn">Deselect All Stocks</button>
+        </div>
+    </div>
+
+    <button id="togglePanel">STOCKS</button>    
+   
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="data.js"></script>
+    <script src="visualization.js"></script>
+    <script src="ui.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
