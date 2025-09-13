@@ -221,6 +221,54 @@ canvas {
     text-shadow: 0 0 10px #00ffff;
 }
 
+#dataPanel {
+    position: fixed;
+    bottom: 20px;
+    left: -320px; /* hidden by default */
+    color: #00ffff;
+    font-size: 11px;
+    z-index: 1000;
+    background: rgba(0,0,0,0.8);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,255,255,0.3);
+    min-width: 300px;
+    max-height: 250px;
+    overflow-y: auto;
+    transition: left 0.4s ease-in-out;
+}
+
+#dataPanel.open {
+    left: 20px; /* slides into view */
+}
+
+#toggleDataPanel {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: linear-gradient(45deg, rgba(0,255,255,0.8), rgba(0,150,255,0.8));
+    color: white;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 2001;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+#toggleDataPanel:hover {
+    background: linear-gradient(45deg, rgba(0,255,255,1), rgba(0,150,255,1));
+    transform: translateX(3px);
+}
+
+/* Push button aside when panel is open */
+#dataPanel.open + #toggleDataPanel {
+    left: 340px;
+}
+
+
 .section-title {
     font-size: 14px;
     font-weight: bold;

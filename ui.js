@@ -178,6 +178,7 @@ function deselectAllStocks() {
 }
 
 // Panel toggle functionality
+// Panel toggle functionality
 function setupPanelControls() {
     const panel = document.getElementById('stockPanel');
     const toggleBtn = document.getElementById('togglePanel');
@@ -185,10 +186,18 @@ function setupPanelControls() {
     const newStockInput = document.getElementById('newStockSymbol');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
+
+    const dataPanel = document.getElementById('dataPanel');
+    const toggleDataBtn = document.getElementById('toggleDataPanel');
     
-    // Toggle panel
+    // Toggle stock panel
     toggleBtn.addEventListener('click', function() {
         panel.classList.toggle('open');
+    });
+
+    // Toggle data panel
+    toggleDataBtn.addEventListener('click', function() {
+        dataPanel.classList.toggle('open');
     });
     
     // Add stock button
@@ -208,6 +217,7 @@ function setupPanelControls() {
     selectAllBtn.addEventListener('click', selectAllStocks);
     deselectAllBtn.addEventListener('click', deselectAllStocks);
 }
+
 
 // Initialize sentiment feed with some sample data
 function initializeSentimentFeed() {

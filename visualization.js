@@ -12,7 +12,8 @@ let mouseX = 0,
 let isRotating = true;
 let time = 0;
 
-// Initialize Three.js
+let controls; // declare at top with scene, camera, renderer
+
 function initThreeJS() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(
@@ -27,6 +28,15 @@ function initThreeJS() {
   document.body.appendChild(renderer.domElement);
 
   camera.position.z = 35;
+
+  // 👉 Add OrbitControls here
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.zoomSpeed = 0.3;
+  controls.enableZoom = true;         // allow zoom with scroll/trackpad
+  controls.enableDamping = true;      // smooth movement
+  controls.dampingFactor = 0.05;
+  controls.minDistance = 10;          // zoom-in limit
+  controls.maxDistance = 200;         // zoom-out limit
 
   // Add enhanced lighting
   const ambientLight = new THREE.AmbientLight(0x004444, 0.4);
@@ -359,6 +369,7 @@ function animate() {
     scene.rotation.x = mouseY * 0.2 + Math.sin(time * 0.7) * 0.1;
   }
 
+  controls.update();
   renderer.render(scene, camera);
 }
 
