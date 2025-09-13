@@ -93,7 +93,7 @@ let marketData = {
 };
 
 // API configuration - You may need to get a new API key from https://www.alphavantage.co/support/#api-key
-const ALPHA_VANTAGE_KEY = "CJM042MJWC9X1OXH";
+const ALPHA_VANTAGE_KEY = "Z156WX7X3NBF8FEF";
 
 // Get active stocks for visualization
 function getActiveStocks() {
@@ -171,6 +171,121 @@ async function testAPIConnection() {
   }
 }
 
+async function fetchVolumeFromAPI(symbol) {
+  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
+
+  try {
+    console.log(`Fetching volume data for ${symbol}...`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data["Error Message"] || data["Note"]) {
+      console.warn(
+        `API issue for ${symbol}:`,
+        data["Error Message"] || data["Note"]
+      );
+      return null;
+    }
+
+    const timeSeries = data["Time Series (Daily)"];
+    if (!timeSeries) {
+      console.warn(`No time series data for ${symbol}`);
+      return null;
+    }
+
+    const dates = Object.keys(timeSeries).sort().reverse();
+    if (dates.length === 0) {
+      console.warn(`No date data for ${symbol}`);
+      return null;
+    }
+
+    const currentDate = dates[0];
+    const currentData = timeSeries[currentDate];
+    const volume = currentData["5. volume"];
+
+    console.log(`${symbol} volume: ${volume} (raw)`);
+    return volume;
+  } catch (err) {
+    console.error(`Error fetching volume for ${symbol}:`, err);
+    return null;
+  }
+}
+async function fetchVolumeFromAPI(symbol) {
+  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
+
+  try {
+    console.log(`Fetching volume data for ${symbol}...`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data["Error Message"] || data["Note"]) {
+      console.warn(
+        `API issue for ${symbol}:`,
+        data["Error Message"] || data["Note"]
+      );
+      return null;
+    }
+
+    const timeSeries = data["Time Series (Daily)"];
+    if (!timeSeries) {
+      console.warn(`No time series data for ${symbol}`);
+      return null;
+    }
+
+    const dates = Object.keys(timeSeries).sort().reverse();
+    if (dates.length === 0) {
+      console.warn(`No date data for ${symbol}`);
+      return null;
+    }
+
+    const currentDate = dates[0];
+    const currentData = timeSeries[currentDate];
+    const volume = currentData["5. volume"];
+
+    console.log(`${symbol} volume: ${volume} (raw)`);
+    return volume;
+  } catch (err) {
+    console.error(`Error fetching volume for ${symbol}:`, err);
+    return null;
+  }
+}
+
+// NEW: Update volumes for all active stocks
+async function updateAllStockVolumes() {
+  const activeStocks = getActiveStocks();
+  console.log(`Updating volumes for ${activeStocks.length} active stocks...`);
+
+  for (const stock of activeStocks) {
+    const rawVolume = await fetchVolumeFromAPI(stock.name);
+    if (rawVolume) {
+      stock.volume = formatVolume(rawVolume);
+      console.log(`✅ Updated ${stock.name} volume: ${stock.volume}`);
+    } else {
+      console.log(`❌ Failed to update ${stock.name} volume`);
+    }
+
+    // Add delay to avoid rate limiting (5 calls per minute free limit)
+    await new Promise((resolve) => setTimeout(resolve, 13000)); // 13 second delay
+  }
+
+  // Update UI after all volumes are updated
+  if (typeof updateUI === "function") {
+    updateUI();
+  }
+  if (typeof renderStockPanel === "function") {
+    renderStockPanel();
+  }
+}
 // Fetch stock data from Alpha Vantage API with improved error handling
 async function fetchStockFromAPI(symbol) {
   // Use simplified daily function instead of daily_adjusted to avoid potential issues
@@ -232,6 +347,7 @@ async function fetchStockFromAPI(symbol) {
       const currentClose = parseFloat(currentData["4. close"]);
       const previousClose = parseFloat(previousData["4. close"]);
       const change = ((currentClose - previousClose) / previousClose) * 100;
+      const rawVolume = currentData["5. volume"];
 
       console.log(
         `${symbol}: Current: ${currentClose}, Previous: ${previousClose}, Change: ${change.toFixed(
@@ -242,7 +358,7 @@ async function fetchStockFromAPI(symbol) {
       return {
         price: currentClose,
         change: change,
-        volume: formatVolume(currentData["5. volume"]),
+        volume: formatVolume(rawVolume),
         sentiment: {
           score: change > 1 ? 0.7 : change < -1 ? -0.7 : 0.0,
           sources: Math.floor(Math.random() * 20) + 10,
@@ -296,7 +412,7 @@ async function updateSingleStock(stockIndex) {
     console.log(
       `✅ Updated ${stock.name}: $${stock.price.toFixed(2)} (${
         stock.change > 0 ? "+" : ""
-      }${stock.change.toFixed(2)}%)`
+      }${stock.change.toFixed(2)}%), Volume: ${stock.volume}`
     );
 
     // Update global market data
@@ -340,6 +456,8 @@ async function initializeStockDataGradually() {
   }
 
   console.log("✅ API connection successful! Starting gradual updates...");
+
+  await updateAllStockVolumes();
 
   // Update stocks one by one with delays
   for (let i = 0; i < allStocks.length; i++) {
@@ -422,8 +540,8 @@ function startPeriodicUpdates() {
     clearInterval(updateInterval);
   }
 
-  console.log("🚀 Starting periodic updates (every 30 seconds)");
-  updateInterval = setInterval(updateMarketData, 30000);
+  console.log("🚀 Starting periodic updates (every 60 seconds)");
+  updateInterval = setInterval(updateMarketData, 60000);
 }
 
 // Create new stock with simulated data
