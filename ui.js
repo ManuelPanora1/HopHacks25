@@ -185,3 +185,7 @@ function initializeSentimentFeed() {
         `;
     }, 2000);
 }
+
+document.getElementById("helpHeader").addEventListener("click", () => {
+    document.getElementById("helpBox").classList.toggle("collapsed");
+});

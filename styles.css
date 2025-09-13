@@ -31,19 +31,6 @@ canvas {
     max-width: 250px;
 }
 
-#controls {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    color: #00ffff;
-    font-size: 12px;
-    z-index: 1000;
-    background: rgba(0,0,0,0.8);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid rgba(0,255,255,0.3);
-}
-
 #title {
     position: fixed;
     top: 20px;
@@ -267,4 +254,44 @@ canvas {
     0% { opacity: 0.6; }
     50% { opacity: 1; }
     100% { opacity: 0.6; }
+}
+
+#helpBox {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 220px;
+    background: rgba(0,0,0,0.85);
+    color: #00ffff;
+    font-size: 12px;
+    z-index: 1500;
+    border: 1px solid rgba(0,255,255,0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+#helpHeader {
+    padding: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    text-align: center;
+    background: rgba(0,255,255,0.1);
+    border-bottom: 1px solid rgba(0,255,255,0.3);
+    user-select: none;
+}
+
+#helpContent {
+    padding: 10px;
+    line-height: 1.4em;
+}
+
+/* collapsed state */
+#helpBox.collapsed {
+    max-height: 30px;
+    opacity: 0.8;
+}
+
+#helpBox.collapsed #helpContent {
+    display: none;
 }
