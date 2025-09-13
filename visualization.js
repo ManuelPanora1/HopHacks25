@@ -4,6 +4,7 @@ let stocks = [];
 const clusters = [];
 const labels = [];
 const pulseRings = [];
+const holographicSpheres = []; // New array to store holographic spheres
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 
@@ -42,9 +43,153 @@ function initThreeJS() {
   const ambientLight = new THREE.AmbientLight(0x004444, 0.4);
   scene.add(ambientLight);
 
+  // Create starfield background
+  createStarfield();
+
   // Initialize stocks
   stocks = getActiveStocks();
   createInitialVisualization();
+}
+
+// Create holographic sphere container for a stock cluster
+function createHolographicSphere(stock, index) {
+  const score = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
+  const baseColor = getSentimentColor(score);
+  console.log(`🔵 Sphere ${index} (${stock.name}): sentiment = ${score.toFixed(3)}, color = rgb(${baseColor.r.toFixed(3)}, ${baseColor.g.toFixed(3)}, ${baseColor.b.toFixed(3)})`);
+  
+  // Create sphere geometry (smaller radius)
+  const sphereGeometry = new THREE.SphereGeometry(5, 32, 32);
+  
+  // Create holographic material (very subtle)
+  const sphereMaterial = new THREE.MeshBasicMaterial({
+    color: baseColor.getHex(),
+    transparent: true,
+    opacity: 0.015, // Much more subtle to let particles stand out
+    wireframe: true,
+    side: THREE.DoubleSide
+  });
+  
+  // Create the sphere mesh
+  const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  
+  // Position the sphere
+  const angle = (index / stocks.length) * Math.PI * 2;
+  const radius = 30; // Increased radius for better separation
+  sphere.position.x = Math.cos(angle) * radius;
+  sphere.position.z = Math.sin(angle) * radius;
+  sphere.position.y = score * 12; // Vertical positioning based on sentiment
+  
+  // Add very subtle glow effect
+  const glowGeometry = new THREE.SphereGeometry(5.3, 32, 32);
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: baseColor.getHex(),
+    transparent: true,
+    opacity: 0.005, // Very subtle glow
+    side: THREE.BackSide
+  });
+  const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+  sphere.add(glow);
+  
+  // Add very subtle outline effect
+  const outlineGeometry = new THREE.SphereGeometry(5.1, 32, 32);
+  const outlineMaterial = new THREE.MeshBasicMaterial({
+    color: baseColor.getHex(),
+    transparent: true,
+    opacity: 0.05, // Very subtle outline
+    wireframe: true,
+    side: THREE.DoubleSide
+  });
+  const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
+  sphere.add(outline);
+  
+  // Store reference data
+  sphere.userData = {
+    stock: stock,
+    index: index,
+    originalOpacity: 0.015,
+    glowOpacity: 0.005,
+    initialPrice: stock.price, // Store initial price for normalization
+    baseRadius: 5 // Store base radius for scaling
+  };
+  
+  return sphere;
+}
+
+// Create a starfield background
+function createStarfield() {
+  const starGeometry = new THREE.BufferGeometry();
+  const starCount = 2000; // Number of stars
+  const positions = new Float32Array(starCount * 3);
+  const colors = new Float32Array(starCount * 3);
+  const sizes = new Float32Array(starCount);
+
+  for (let i = 0; i < starCount; i++) {
+    const i3 = i * 3;
+    
+    // Random positions in a large sphere around the scene
+    const radius = 200 + Math.random() * 300; // Stars at various distances
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    
+    positions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+    positions[i3 + 2] = radius * Math.cos(phi);
+    
+    // Random star colors (white to blue-white)
+    const colorVariation = Math.random();
+    colors[i3] = 0.8 + colorVariation * 0.2; // Red
+    colors[i3 + 1] = 0.8 + colorVariation * 0.2; // Green
+    colors[i3 + 2] = 1.0; // Blue (slightly more blue for space feel)
+    
+    // Random star sizes
+    sizes[i] = Math.random() * 2 + 0.5;
+  }
+
+  starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  starGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const starMaterial = new THREE.PointsMaterial({
+    size: 1,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.8,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending
+  });
+
+  const stars = new THREE.Points(starGeometry, starMaterial);
+  stars.userData = { type: 'starfield' };
+  scene.add(stars);
+}
+
+// Update sphere size based on current price relative to initial price
+function updateSphereSize(sphere) {
+  if (!sphere.userData || !sphere.userData.stock) return;
+  
+  const currentPrice = sphere.userData.stock.price;
+  const initialPrice = sphere.userData.initialPrice;
+  const baseRadius = sphere.userData.baseRadius;
+  
+  // Calculate price ratio (normalized)
+  const priceRatio = currentPrice / initialPrice;
+  
+  // Apply scaling with some bounds to prevent extreme sizes
+  const minScale = 0.3; // Minimum 30% of original size
+  const maxScale = 3.0; // Maximum 300% of original size
+  const scaleFactor = Math.max(minScale, Math.min(maxScale, priceRatio));
+  
+  // Update sphere scale
+  sphere.scale.setScalar(scaleFactor);
+  sphere.userData.baseScale = scaleFactor; // Store for volatility pulsing
+  
+  // Update glow and outline scales to match
+  if (sphere.children[0]) {
+    sphere.children[0].scale.setScalar(scaleFactor);
+  }
+  if (sphere.children[1]) {
+    sphere.children[1].scale.setScalar(scaleFactor);
+  }
 }
 
 // Helper function to calculate sentiment color with white neutral
@@ -52,23 +197,29 @@ function getSentimentColor(score) {
   // Clamp score to -1 to 1 range
   const clampedScore = Math.max(-1, Math.min(1, score));
   
-  if (Math.abs(clampedScore) <= 0.1) {
-    // Neutral sentiment - White
-    return new THREE.Color(1, 1, 1);
-  } else if (clampedScore > 0.1) {
-    // Positive sentiment - gradient from white to bright green
-    const intensity = (clampedScore - 0.1) / 0.9; // Normalize to 0-1 range
-    const r = 1 - intensity * 0.8; // Start from white (1) and go down
-    const g = 1; // Keep green at maximum
-    const b = 1 - intensity * 0.8; // Start from white (1) and go down
+  console.log(`🎨 getSentimentColor called with score: ${score}, clamped: ${clampedScore}`);
+  
+  // Gradient color mapping: closer to 0 = whiter, further from 0 = more saturated
+  const intensity = Math.abs(clampedScore); // 0 to 1 (distance from 0)
+  
+  if (clampedScore < 0) {
+    // Negative sentiment: RED gradient (closer to 0 = whiter)
+    const r = 1; // Always full red
+    const g = 1 - intensity; // More white when closer to 0
+    const b = 1 - intensity; // More white when closer to 0
+    console.log(`🔴 RED GRADIENT: intensity=${intensity.toFixed(3)}, rgb(${r}, ${g.toFixed(3)}, ${b.toFixed(3)})`);
+    return new THREE.Color(r, g, b);
+  } else if (clampedScore > 0) {
+    // Positive sentiment: GREEN gradient (closer to 0 = whiter)
+    const r = 1 - intensity; // More white when closer to 0
+    const g = 1; // Always full green
+    const b = 1 - intensity; // More white when closer to 0
+    console.log(`🟢 GREEN GRADIENT: intensity=${intensity.toFixed(3)}, rgb(${r.toFixed(3)}, ${g}, ${b.toFixed(3)})`);
     return new THREE.Color(r, g, b);
   } else {
-    // Negative sentiment - gradient from white to darker red
-    const intensity = Math.abs(clampedScore + 0.1) / 0.9; // Normalize to 0-1 range
-    const r = 1; // Keep red at maximum
-    const g = 1 - intensity * 0.8; // Start from white (1) and go down
-    const b = 1 - intensity * 0.8; // Start from white (1) and go down
-    return new THREE.Color(r, g, b);
+    // Zero sentiment: WHITE
+    console.log(`⚪ WHITE: zero sentiment`);
+    return new THREE.Color(1, 1, 1); // White
   }
 }
 
@@ -94,14 +245,15 @@ function createStockCluster(stock, index) {
       : 0;
   
   const baseColor = getSentimentColor(score);
+  console.log(`🔴 Particles ${index} (${stock.name}): sentiment = ${score.toFixed(3)}, color = rgb(${baseColor.r.toFixed(3)}, ${baseColor.g.toFixed(3)}, ${baseColor.b.toFixed(3)})`);
 
   for (let j = 0; j < particleCount; j++) {
     const i3 = j * 3;
 
-    // Create distribution based on volatility
+    // Create distribution within the sphere (proportionally smaller for smaller spheres)
     const volatilityFactor =
-      1 + (typeof stock.volatility === "number" ? stock.volatility : 0) * 3;
-    const radius = (Math.random() * 4 + 1) * volatilityFactor;
+      1 + (typeof stock.volatility === "number" ? stock.volatility : 0) * 2;
+    const radius = (Math.random() * 2 + 0.3) * volatilityFactor; // Proportionally smaller radius
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
 
@@ -109,30 +261,20 @@ function createStockCluster(stock, index) {
     positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
     positions[i3 + 2] = radius * Math.cos(phi);
 
-    // Color variation based on sentiment confidence (reduced for brighter colors)
-    const colorVariation = 0.15 * (1 - Math.abs(score));
-    colors[i3] = Math.max(
-      0.2, // Minimum brightness floor
-      Math.min(1.5, baseColor.r + (Math.random() - 0.5) * colorVariation)
-    );
-    colors[i3 + 1] = Math.max(
-      0.2, // Minimum brightness floor
-      Math.min(1.5, baseColor.g + (Math.random() - 0.5) * colorVariation)
-    );
-    colors[i3 + 2] = Math.max(
-      0.2, // Minimum brightness floor
-      Math.min(1.5, baseColor.b + (Math.random() - 0.5) * colorVariation)
-    );
+    // Use exact same color as sphere (no variation)
+    colors[i3] = baseColor.r;
+    colors[i3 + 1] = baseColor.g;
+    colors[i3 + 2] = baseColor.b;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 4 + (typeof stock.volatility === "number" ? stock.volatility : 0) * 3,
+    size: 6 + (typeof stock.volatility === "number" ? stock.volatility : 0) * 4, // Much larger particles
     sizeAttenuation: false,
     transparent: true,
-    opacity: 0.7 + Math.abs(score) * 0.3,
+    opacity: 0.95 + Math.abs(score) * 0.05, // Much higher opacity for better visibility
     vertexColors: true,
   });
 
@@ -159,30 +301,22 @@ function createStockCluster(stock, index) {
     pulseIntensity: typeof stock.volatility === "number" ? stock.volatility : 0,
   };
 
-  // Position based on sentiment
-  const angle = (index / stocks.length) * Math.PI * 2;
-  const radius = 20;
-  particles.position.x = Math.cos(angle) * radius;
-  particles.position.z = Math.sin(angle) * radius;
-  particles.position.y = score * 8;
+  // Position particles at origin (they will be positioned by the parent sphere)
+  particles.position.set(0, 0, 0);
 
-  if (scene && particles) {
-    scene.add(particles);
-  }
-
-  // Add pulse ring for high volatility stocks
+  // Add pulse ring for high volatility stocks (proportionally smaller)
   if (typeof stock.volatility === "number" && stock.volatility > 0.6) {
-    const ringGeometry = new THREE.RingGeometry(8, 9, 32);
+    const ringGeometry = new THREE.RingGeometry(3.5, 4, 32); // Proportionally smaller ring
     const ringMaterial = new THREE.MeshBasicMaterial({
       color: baseColor.getHex(), // Use the same color as the particles
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.4,
       side: THREE.DoubleSide,
     });
     const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.position.copy(particles.position);
+    ring.position.set(0, 0, 0);
     ring.rotation.x = Math.PI / 2;
-    scene.add(ring);
+    particles.add(ring); // Add ring as child of particles
     pulseRings.push({ ring: ring, intensity: stock.volatility });
   }
 
@@ -193,28 +327,32 @@ function createStockCluster(stock, index) {
 function getSentimentColorCSS(score) {
   const clampedScore = Math.max(-1, Math.min(1, score));
   
-  if (Math.abs(clampedScore) <= 0.1) {
-    // Neutral - White
-    return { bg: "rgba(255, 255, 255, 0.2)", text: "#ffffff" };
-  } else if (clampedScore > 0.1) {
-    // Positive - gradient from white to bright green
-    const intensity = (clampedScore - 0.1) / 0.9;
-    const r = Math.floor(255 * (1 - intensity * 0.8));
-    const g = 255;
-    const b = Math.floor(255 * (1 - intensity * 0.8));
+  // Gradient color mapping: closer to 0 = whiter, further from 0 = more saturated
+  const intensity = Math.abs(clampedScore); // 0 to 1 (distance from 0)
+  
+  if (clampedScore < 0) {
+    // Negative sentiment: RED gradient (closer to 0 = whiter)
+    const r = 255; // Always full red
+    const g = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    const b = Math.floor(255 * (1 - intensity)); // More white when closer to 0
     return { 
-      bg: `rgba(${r}, ${g}, ${b}, 0.2)`,
+      bg: `rgba(${r}, ${g}, ${b}, 0.3)`,
+      text: `rgb(${r}, ${g}, ${b})`
+    };
+  } else if (clampedScore > 0) {
+    // Positive sentiment: GREEN gradient (closer to 0 = whiter)
+    const r = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    const g = 255; // Always full green
+    const b = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    return { 
+      bg: `rgba(${r}, ${g}, ${b}, 0.3)`,
       text: `rgb(${r}, ${g}, ${b})`
     };
   } else {
-    // Negative - gradient from white to darker red
-    const intensity = Math.abs(clampedScore + 0.1) / 0.9;
-    const r = 255;
-    const g = Math.floor(255 * (1 - intensity * 0.8));
-    const b = Math.floor(255 * (1 - intensity * 0.8));
+    // Zero sentiment: WHITE
     return { 
-      bg: `rgba(${r}, ${g}, ${b}, 0.2)`,
-      text: `rgb(${r}, ${g}, ${b})`
+      bg: `rgba(255, 255, 255, 0.3)`,
+      text: `rgb(255, 255, 255)`
     };
   }
 }
@@ -281,20 +419,31 @@ function createStockLabel(stock, position) {
 // Create initial visualization
 function createInitialVisualization() {
   stocks.forEach((stock, i) => {
+    // Create holographic sphere container
+    const sphere = createHolographicSphere(stock, i);
+    holographicSpheres.push(sphere);
+    
+    // Create particle cluster within the sphere
     const cluster = createStockCluster(stock, i);
+    sphere.add(cluster); // Add particles as child of sphere
     clusters.push(cluster);
 
-    const label = createStockLabel(stock, cluster.position);
+    // Create label positioned relative to the sphere
+    const label = createStockLabel(stock, sphere.position);
     labels.push(label);
+    
+    // Add sphere to scene
+    scene.add(sphere);
   });
 }
 
 // Clear all visualization objects
 function clearVisualization() {
-  clusters.forEach((cluster) => scene.remove(cluster));
+  holographicSpheres.forEach((sphere) => scene.remove(sphere));
   labels.forEach((label) => scene.remove(label));
   pulseRings.forEach((ring) => scene.remove(ring.ring));
 
+  holographicSpheres.length = 0;
   clusters.length = 0;
   labels.length = 0;
   pulseRings.length = 0;
@@ -306,11 +455,21 @@ function recreateVisualization() {
   stocks = getActiveStocks();
 
   stocks.forEach((stock, i) => {
+    // Create holographic sphere container
+    const sphere = createHolographicSphere(stock, i);
+    holographicSpheres.push(sphere);
+    
+    // Create particle cluster within the sphere
     const cluster = createStockCluster(stock, i);
+    sphere.add(cluster); // Add particles as child of sphere
     clusters.push(cluster);
 
-    const label = createStockLabel(stock, cluster.position);
+    // Create label positioned relative to the sphere
+    const label = createStockLabel(stock, sphere.position);
     labels.push(label);
+    
+    // Add sphere to scene
+    scene.add(sphere);
   });
 }
 
@@ -318,6 +477,44 @@ function recreateVisualization() {
 function animate() {
   requestAnimationFrame(animate);
   time += 0.01;
+
+  // Animate holographic spheres
+  holographicSpheres.forEach((sphere, index) => {
+    if (!sphere.userData) return;
+    
+    const stock = sphere.userData.stock;
+    const sentimentScore = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
+    const volatility = typeof stock.volatility === "number" ? stock.volatility : 0;
+    
+    // Update sphere size based on current price
+    updateSphereSize(sphere);
+    
+    // Animate sphere opacity and glow with reduced intensity to let particles stand out
+    const volatilityMultiplier = 1 + volatility * 2; // Reduced multiplier to make spheres more subtle
+    const pulseIntensity = (0.1 + Math.abs(sentimentScore) * 0.05) * volatilityMultiplier; // Reduced base intensity
+    sphere.material.opacity = sphere.userData.originalOpacity + Math.sin(time * (3 + volatility * 2) + index) * pulseIntensity;
+    
+    // Animate glow effect with reduced variation
+    if (sphere.children[0] && sphere.children[0].material) {
+      const glowVariation = (0.05 + volatility * 0.1) * volatilityMultiplier; // Reduced variation
+      sphere.children[0].material.opacity = sphere.userData.glowOpacity + Math.sin(time * (2.5 + volatility * 1.5) + index) * glowVariation;
+    }
+    
+    // Animate outline effect with reduced variation
+    if (sphere.children[1] && sphere.children[1].material) {
+      const outlineVariation = (0.05 + volatility * 0.1) * volatilityMultiplier; // Reduced variation
+      sphere.children[1].material.opacity = 0.05 + Math.sin(time * (3.5 + volatility * 2) + index) * outlineVariation;
+    }
+    
+    // Rotate sphere slowly
+    sphere.rotation.y += 0.002 + volatility * 0.003;
+    sphere.rotation.x = Math.sin(time * 0.5 + index) * 0.1;
+    
+    // Add dramatically enhanced volatility-based pulsing on top of price-based scaling
+    const volatilityPulse = 1 + Math.sin(time * (2.5 + volatility * 2.5) + index) * volatility * (0.1 + volatility * 0.2); // Much more dramatic scaling
+    const baseScale = sphere.userData.baseScale || 1;
+    sphere.scale.setScalar(baseScale * volatilityPulse);
+  });
 
   // Animate particles with sentiment-based pulsing
   clusters.forEach((cluster, index) => {
@@ -328,39 +525,66 @@ function animate() {
     const pulseIntensity = cluster.userData.pulseIntensity || 0;
     const stock = cluster.userData.stock;
 
-    // Create pulsing effect based on volatility and sentiment
-    const pulseSpeed = 0.01 + pulseIntensity * 0.02;
-    const pulseAmplitude = 0.3 + pulseIntensity * 0.7;
+    // Create dramatically enhanced volatility-based pulsing effect for particles
+    const volatilityMultiplier = 1 + pulseIntensity * 3; // Much higher volatility = up to 4x more intense particle movement
+    const pulseSpeed = (0.04 + pulseIntensity * 0.06) * volatilityMultiplier; // Much faster pulsing for volatile stocks
+    const pulseAmplitude = (0.6 + pulseIntensity * 1.0) * volatilityMultiplier; // Dramatically more amplitude for volatile stocks
 
     for (let i = 0; i < positions.length; i += 3) {
       const pulse =
         Math.sin(time * pulseSpeed + index + i * 0.01) * pulseAmplitude;
-      positions[i] = originalPositions[i] + pulse * 0.5;
+      const movementMultiplier = 0.8 + pulseIntensity * 0.6; // Much more movement for volatile stocks
+      positions[i] = originalPositions[i] + pulse * movementMultiplier;
       positions[i + 1] =
         originalPositions[i + 1] +
-        Math.cos(time * pulseSpeed + index + i * 0.01) * pulseAmplitude * 0.3;
-      positions[i + 2] = originalPositions[i + 2] + pulse * 0.4;
+        Math.cos(time * pulseSpeed + index + i * 0.01) * pulseAmplitude * (0.6 + pulseIntensity * 0.4);
+      positions[i + 2] = originalPositions[i + 2] + pulse * (0.6 + pulseIntensity * 0.4);
     }
 
     cluster.geometry.attributes.position.needsUpdate = true;
-    cluster.rotation.y += 0.005 + pulseIntensity * 0.01;
-    cluster.rotation.x = Math.sin(time + index) * 0.1;
+    cluster.rotation.y += 0.003 + pulseIntensity * 0.005; // Slower rotation
+    cluster.rotation.x = Math.sin(time + index) * 0.05;
 
-    // Animate opacity based on sentiment confidence
+    // Animate opacity based on sentiment confidence with dramatically enhanced volatility-based pulsing
     const sentimentScore = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
-    cluster.material.opacity = 0.7 + Math.abs(sentimentScore) * 0.3 + Math.sin(time * 2) * 0.1;
+    const volatilityOpacityMultiplier = 1 + pulseIntensity * 2.5; // Much higher volatility = up to 3.5x more opacity variation
+    const opacityVariation = (0.15 + pulseIntensity * 0.3) * volatilityOpacityMultiplier; // Reduced variation to keep particles more visible
+    cluster.material.opacity = 0.95 + Math.abs(sentimentScore) * 0.05 + Math.sin(time * (4 + pulseIntensity * 3) + index) * opacityVariation;
   });
 
-  // Animate pulse rings
+  // Animate pulse rings with dramatically enhanced volatility-based effects
   pulseRings.forEach((ringData) => {
-    ringData.ring.scale.x = 1 + Math.sin(time * 3) * 0.3 * ringData.intensity;
-    ringData.ring.scale.y = 1 + Math.sin(time * 3) * 0.3 * ringData.intensity;
-    ringData.ring.material.opacity = 0.3 + Math.sin(time * 2) * 0.2;
+    const volatilityMultiplier = 1 + ringData.intensity * 3; // Much higher volatility = up to 4x more intense ring effects
+    const scaleVariation = 0.6 * ringData.intensity * volatilityMultiplier; // Much more scaling variation
+    const opacityVariation = 0.4 * volatilityMultiplier; // Much more opacity variation
+    const pulseSpeed = 6 + ringData.intensity * 4; // Much faster pulsing for more volatile stocks
+    
+    ringData.ring.scale.x = 1 + Math.sin(time * pulseSpeed) * scaleVariation;
+    ringData.ring.scale.y = 1 + Math.sin(time * pulseSpeed) * scaleVariation;
+    ringData.ring.material.opacity = 0.4 + Math.sin(time * (5 + ringData.intensity * 3)) * opacityVariation;
   });
 
   // Update label rotations
   labels.forEach((label) => {
     label.lookAt(camera.position);
+  });
+
+  // Animate starfield twinkling
+  scene.children.forEach((child) => {
+    if (child.userData && child.userData.type === 'starfield') {
+      const positions = child.geometry.attributes.position.array;
+      const colors = child.geometry.attributes.color.array;
+      
+      // Make stars twinkle by varying their opacity
+      for (let i = 0; i < positions.length; i += 3) {
+        const twinkle = Math.sin(time * 2 + i * 0.01) * 0.3 + 0.7;
+        child.material.opacity = twinkle * 0.8;
+      }
+      
+      // Slowly rotate the starfield
+      child.rotation.y += 0.0005;
+      child.rotation.x += 0.0002;
+    }
   });
 
   if (isRotating && typeof marketData !== "undefined") {
@@ -385,7 +609,7 @@ function setupMouseInteraction() {
     mouse.y = mouseY;
 
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(clusters);
+    const intersects = raycaster.intersectObjects(holographicSpheres);
 
     if (intersects.length > 0) {
       const stock = intersects[0].object.userData.stock;

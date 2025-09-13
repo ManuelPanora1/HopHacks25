@@ -4,23 +4,24 @@
 function getSentimentColorForUI(score) {
   const clampedScore = Math.max(-1, Math.min(1, score));
   
-  if (Math.abs(clampedScore) <= 0.1) {
-    // Neutral - Bright white
-    return "#ffffff";
-  } else if (clampedScore > 0.1) {
-    // Positive - gradient from bright white to vibrant green
-    const intensity = (clampedScore - 0.1) / 0.9;
-    const r = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
-    const g = Math.min(255, Math.floor(255 * 1.4)); // Extra bright green, clamped to 255
-    const b = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
-    return `rgb(${Math.min(255, r)}, ${g}, ${Math.min(255, b)})`;
+  // Gradient color mapping: closer to 0 = whiter, further from 0 = more saturated
+  const intensity = Math.abs(clampedScore); // 0 to 1 (distance from 0)
+  
+  if (clampedScore < 0) {
+    // Negative sentiment: RED gradient (closer to 0 = whiter)
+    const r = 255; // Always full red
+    const g = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    const b = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    return `rgb(${r}, ${g}, ${b})`;
+  } else if (clampedScore > 0) {
+    // Positive sentiment: GREEN gradient (closer to 0 = whiter)
+    const r = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    const g = 255; // Always full green
+    const b = Math.floor(255 * (1 - intensity)); // More white when closer to 0
+    return `rgb(${r}, ${g}, ${b})`;
   } else {
-    // Negative - gradient from bright white to vibrant red
-    const intensity = Math.abs(clampedScore + 0.1) / 0.9;
-    const r = Math.min(255, Math.floor(255 * 1.4)); // Extra bright red, clamped to 255
-    const g = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
-    const b = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
-    return `rgb(${r}, ${Math.min(255, g)}, ${Math.min(255, b)})`;
+    // Zero sentiment: WHITE
+    return `rgb(255, 255, 255)`;
   }
 }
 
