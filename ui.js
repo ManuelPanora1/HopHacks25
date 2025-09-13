@@ -1,19 +1,46 @@
 // UI Management and Panel Controls
 
+// Helper function to get sentiment color matching the visualization (CSS format)
+function getSentimentColorForUI(score) {
+  const clampedScore = Math.max(-1, Math.min(1, score));
+  
+  if (Math.abs(clampedScore) <= 0.1) {
+    // Neutral - Bright white
+    return "#ffffff";
+  } else if (clampedScore > 0.1) {
+    // Positive - gradient from bright white to vibrant green
+    const intensity = (clampedScore - 0.1) / 0.9;
+    const r = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
+    const g = Math.min(255, Math.floor(255 * 1.4)); // Extra bright green, clamped to 255
+    const b = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
+    return `rgb(${Math.min(255, r)}, ${g}, ${Math.min(255, b)})`;
+  } else {
+    // Negative - gradient from bright white to vibrant red
+    const intensity = Math.abs(clampedScore + 0.1) / 0.9;
+    const r = Math.min(255, Math.floor(255 * 1.4)); // Extra bright red, clamped to 255
+    const g = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
+    const b = Math.floor(255 * Math.max(0.2, 1.2 - intensity * 1.0));
+    return `rgb(${r}, ${Math.min(255, g)}, ${Math.min(255, b)})`;
+  }
+}
+
 // Update market health display
 function updateUI() {
     const sentimentEl = document.getElementById('sentimentValue');
     const riskEl = document.getElementById('riskLevel');
     
+    // Use the new color system for overall sentiment
+    const overallSentimentColor = getSentimentColorForUI(marketData.overallSentiment);
+    
     if (marketData.overallSentiment > 0.3) {
         sentimentEl.textContent = 'BULLISH';
-        sentimentEl.style.color = '#00ff44';
+        sentimentEl.style.color = overallSentimentColor;
     } else if (marketData.overallSentiment < -0.3) {
         sentimentEl.textContent = 'BEARISH';
-        sentimentEl.style.color = '#ff4400';
+        sentimentEl.style.color = overallSentimentColor;
     } else {
         sentimentEl.textContent = 'NEUTRAL';
-        sentimentEl.style.color = '#ffaa00';
+        sentimentEl.style.color = overallSentimentColor;
     }
     
     if (marketData.riskLevel > 0.7) {
@@ -50,7 +77,7 @@ function updateUI() {
     }
 }
 
-// Render stock selection panel
+// Render stock selection panel with matching sentiment colors
 function renderStockPanel() {
     const stockList = document.getElementById('stockList');
     stockList.innerHTML = '';
@@ -59,20 +86,28 @@ function renderStockPanel() {
         const stockItem = document.createElement('div');
         stockItem.className = `stock-item ${stock.active ? 'active' : ''}`;
         
-        const sentimentClass = stock.sentiment.score > 0 ? 'positive' : 
-                             stock.sentiment.score < 0 ? 'negative' : 'neutral';
+        // Get the matching sentiment color from our gradient system
+        const sentimentColor = getSentimentColorForUI(stock.sentiment.score);
+        const sentimentClass = stock.sentiment.score > 0.1 ? 'positive' : 
+                             stock.sentiment.score < -0.1 ? 'negative' : 'neutral';
+        
+        // Get price change color
+        const changeColor = stock.change > 0 ? getSentimentColorForUI(0.5) : 
+                           stock.change < 0 ? getSentimentColorForUI(-0.5) : 
+                           getSentimentColorForUI(0);
         
         stockItem.innerHTML = `
             <div style="flex: 1;">
                 <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                    <span class="sentiment-indicator ${sentimentClass}"></span>
-                    <strong>${stock.name}</strong>
-                    <span style="margin-left: 10px; font-size: 12px; color: rgba(0,255,255,0.7);">
+                    <span class="sentiment-indicator ${sentimentClass}" style="background-color: ${sentimentColor}; border: 1px solid ${sentimentColor};"></span>
+                    <strong style="color: ${sentimentColor};">${stock.name}</strong>
+                    <span style="margin-left: 10px; font-size: 12px; color: ${changeColor};">
                         ${stock.change > 0 ? '+' : ''}${stock.change.toFixed(1)}%
                     </span>
                 </div>
                 <div class="stock-info">
-                    $${stock.price.toFixed(2)} • Vol: ${stock.volume} • Sent: ${stock.sentiment.score.toFixed(2)}
+                    <span style="color: rgba(255,255,255,0.8);">$${stock.price.toFixed(2)} • Vol: ${stock.volume} • </span>
+                    <span style="color: ${sentimentColor};">Sent: ${stock.sentiment.score.toFixed(2)}</span>
                 </div>
             </div>
             <div class="stock-toggle ${stock.active ? 'checked' : ''}" data-symbol="${stock.name}"></div>

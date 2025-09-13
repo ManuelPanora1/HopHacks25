@@ -37,6 +37,31 @@ function initThreeJS() {
   createInitialVisualization();
 }
 
+// Helper function to calculate sentiment color with white neutral
+function getSentimentColor(score) {
+  // Clamp score to -1 to 1 range
+  const clampedScore = Math.max(-1, Math.min(1, score));
+  
+  if (Math.abs(clampedScore) <= 0.1) {
+    // Neutral sentiment - White
+    return new THREE.Color(1, 1, 1);
+  } else if (clampedScore > 0.1) {
+    // Positive sentiment - gradient from white to bright green
+    const intensity = (clampedScore - 0.1) / 0.9; // Normalize to 0-1 range
+    const r = 1 - intensity * 0.8; // Start from white (1) and go down
+    const g = 1; // Keep green at maximum
+    const b = 1 - intensity * 0.8; // Start from white (1) and go down
+    return new THREE.Color(r, g, b);
+  } else {
+    // Negative sentiment - gradient from white to darker red
+    const intensity = Math.abs(clampedScore + 0.1) / 0.9; // Normalize to 0-1 range
+    const r = 1; // Keep red at maximum
+    const g = 1 - intensity * 0.8; // Start from white (1) and go down
+    const b = 1 - intensity * 0.8; // Start from white (1) and go down
+    return new THREE.Color(r, g, b);
+  }
+}
+
 // Create particle systems with enhanced sentiment visualization
 function createStockCluster(stock, index) {
   if (
@@ -52,21 +77,13 @@ function createStockCluster(stock, index) {
   const positions = new Float32Array(particleCount * 3);
   const colors = new Float32Array(particleCount * 3);
 
-  // Color based on sentiment and price change
-  let baseColor;
+  // Color based on sentiment using new color scheme
   const score =
     stock.sentiment && typeof stock.sentiment.score === "number"
       ? stock.sentiment.score
       : 0;
-  if (score > 0.5) {
-    baseColor = new THREE.Color(0, 1, 0.2);
-  } else if (score > 0) {
-    baseColor = new THREE.Color(0, 0.8, 0.6);
-  } else if (score > -0.5) {
-    baseColor = new THREE.Color(0.8, 0.8, 0);
-  } else {
-    baseColor = new THREE.Color(1, 0.2, 0);
-  }
+  
+  const baseColor = getSentimentColor(score);
 
   for (let j = 0; j < particleCount; j++) {
     const i3 = j * 3;
@@ -82,19 +99,19 @@ function createStockCluster(stock, index) {
     positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
     positions[i3 + 2] = radius * Math.cos(phi);
 
-    // Color variation based on sentiment confidence
-    const colorVariation = 0.3 * (1 - Math.abs(stock.sentiment.score));
+    // Color variation based on sentiment confidence (reduced for brighter colors)
+    const colorVariation = 0.15 * (1 - Math.abs(score));
     colors[i3] = Math.max(
-      0,
-      baseColor.r + (Math.random() - 0.5) * colorVariation
+      0.2, // Minimum brightness floor
+      Math.min(1.5, baseColor.r + (Math.random() - 0.5) * colorVariation)
     );
     colors[i3 + 1] = Math.max(
-      0,
-      baseColor.g + (Math.random() - 0.5) * colorVariation
+      0.2, // Minimum brightness floor
+      Math.min(1.5, baseColor.g + (Math.random() - 0.5) * colorVariation)
     );
     colors[i3 + 2] = Math.max(
-      0,
-      baseColor.b + (Math.random() - 0.5) * colorVariation
+      0.2, // Minimum brightness floor
+      Math.min(1.5, baseColor.b + (Math.random() - 0.5) * colorVariation)
     );
   }
 
@@ -102,10 +119,10 @@ function createStockCluster(stock, index) {
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
   const material = new THREE.PointsMaterial({
-    size: 4 + stock.volatility * 3,
+    size: 4 + (typeof stock.volatility === "number" ? stock.volatility : 0) * 3,
     sizeAttenuation: false,
     transparent: true,
-    opacity: 0.7 + Math.abs(stock.sentiment.score) * 0.3,
+    opacity: 0.7 + Math.abs(score) * 0.3,
     vertexColors: true,
   });
 
@@ -129,7 +146,7 @@ function createStockCluster(stock, index) {
     stock: stock,
     originalPositions: positions.slice(),
     index: index,
-    pulseIntensity: stock.volatility,
+    pulseIntensity: typeof stock.volatility === "number" ? stock.volatility : 0,
   };
 
   // Position based on sentiment
@@ -137,10 +154,7 @@ function createStockCluster(stock, index) {
   const radius = 20;
   particles.position.x = Math.cos(angle) * radius;
   particles.position.z = Math.sin(angle) * radius;
-  particles.position.y =
-    (stock.sentiment && typeof stock.sentiment.score === "number"
-      ? stock.sentiment.score
-      : 0) * 8;
+  particles.position.y = score * 8;
 
   if (scene && particles) {
     scene.add(particles);
@@ -150,7 +164,7 @@ function createStockCluster(stock, index) {
   if (typeof stock.volatility === "number" && stock.volatility > 0.6) {
     const ringGeometry = new THREE.RingGeometry(8, 9, 32);
     const ringMaterial = new THREE.MeshBasicMaterial({
-      color: stock.sentiment && stock.sentiment.score > 0 ? 0x00ff44 : 0xff4400,
+      color: baseColor.getHex(), // Use the same color as the particles
       transparent: true,
       opacity: 0.3,
       side: THREE.DoubleSide,
@@ -165,6 +179,36 @@ function createStockCluster(stock, index) {
   return particles;
 }
 
+// Helper function to get sentiment color for labels (CSS format)
+function getSentimentColorCSS(score) {
+  const clampedScore = Math.max(-1, Math.min(1, score));
+  
+  if (Math.abs(clampedScore) <= 0.1) {
+    // Neutral - White
+    return { bg: "rgba(255, 255, 255, 0.2)", text: "#ffffff" };
+  } else if (clampedScore > 0.1) {
+    // Positive - gradient from white to bright green
+    const intensity = (clampedScore - 0.1) / 0.9;
+    const r = Math.floor(255 * (1 - intensity * 0.8));
+    const g = 255;
+    const b = Math.floor(255 * (1 - intensity * 0.8));
+    return { 
+      bg: `rgba(${r}, ${g}, ${b}, 0.2)`,
+      text: `rgb(${r}, ${g}, ${b})`
+    };
+  } else {
+    // Negative - gradient from white to darker red
+    const intensity = Math.abs(clampedScore + 0.1) / 0.9;
+    const r = 255;
+    const g = Math.floor(255 * (1 - intensity * 0.8));
+    const b = Math.floor(255 * (1 - intensity * 0.8));
+    return { 
+      bg: `rgba(${r}, ${g}, ${b}, 0.2)`,
+      text: `rgb(${r}, ${g}, ${b})`
+    };
+  }
+}
+
 // Create enhanced labels with sentiment indicators
 function createStockLabel(stock, position) {
   const canvas = document.createElement("canvas");
@@ -172,21 +216,19 @@ function createStockLabel(stock, position) {
   canvas.height = 100;
   const context = canvas.getContext("2d");
 
-  // Background with sentiment-based color
+  // Background with sentiment-based gradient color
   const score =
     stock.sentiment && typeof stock.sentiment.score === "number"
       ? stock.sentiment.score
       : 0;
-  context.fillStyle =
-    score > 0
-      ? "rgba(0, 255, 68, 0.2)"
-      : score < 0
-      ? "rgba(255, 68, 0, 0.2)"
-      : "rgba(255, 170, 0, 0.2)";
+  
+  const colors = getSentimentColorCSS(score);
+  
+  context.fillStyle = colors.bg;
   context.fillRect(0, 0, 300, 100);
 
   // Main text
-  context.fillStyle = score > 0 ? "#00ff44" : score < 0 ? "#ff4400" : "#ffaa00";
+  context.fillStyle = colors.text;
   context.font = "bold 28px Courier New";
   context.textAlign = "center";
   context.fillText(stock.name, 150, 35);
@@ -202,8 +244,8 @@ function createStockLabel(stock, position) {
 
   // Sentiment indicator
   context.font = "12px Courier New";
-  const sentimentText = stock.sentiment.trend.toUpperCase().replace("_", " ");
-  context.fillText(`${sentimentText} (${stock.sentiment.sources})`, 150, 78);
+  const sentimentText = stock.sentiment.trend ? stock.sentiment.trend.toUpperCase().replace("_", " ") : "NEUTRAL";
+  context.fillText(`${sentimentText} (${stock.sentiment.sources || 0})`, 150, 78);
 
   const labelTexture = new THREE.CanvasTexture(canvas);
   const labelGeometry = new THREE.PlaneGeometry(10, 3.3);
@@ -269,9 +311,11 @@ function animate() {
 
   // Animate particles with sentiment-based pulsing
   clusters.forEach((cluster, index) => {
+    if (!cluster.geometry || !cluster.geometry.attributes || !cluster.userData) return;
+    
     const positions = cluster.geometry.attributes.position.array;
     const originalPositions = cluster.userData.originalPositions;
-    const pulseIntensity = cluster.userData.pulseIntensity;
+    const pulseIntensity = cluster.userData.pulseIntensity || 0;
     const stock = cluster.userData.stock;
 
     // Create pulsing effect based on volatility and sentiment
@@ -293,8 +337,8 @@ function animate() {
     cluster.rotation.x = Math.sin(time + index) * 0.1;
 
     // Animate opacity based on sentiment confidence
-    cluster.material.opacity =
-      0.7 + Math.abs(stock.sentiment.score) * 0.3 + Math.sin(time * 2) * 0.1;
+    const sentimentScore = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
+    cluster.material.opacity = 0.7 + Math.abs(sentimentScore) * 0.3 + Math.sin(time * 2) * 0.1;
   });
 
   // Animate pulse rings
@@ -334,12 +378,8 @@ function setupMouseInteraction() {
 
     if (intersects.length > 0) {
       const stock = intersects[0].object.userData.stock;
-      const sentimentClass =
-        stock.sentiment.score > 0
-          ? "positive"
-          : stock.sentiment.score < 0
-          ? "negative"
-          : "neutral";
+      const score = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
+      const sentimentClass = score > 0.1 ? "positive" : score < -0.1 ? "negative" : "neutral";
 
       tooltip.innerHTML = `
                 <div style="font-size: 16px; margin-bottom: 6px; display: flex; align-items: center;">
@@ -361,9 +401,7 @@ function setupMouseInteraction() {
                 }</div>
                 <div>Volume: ${stock.volume ? stock.volume : "N/A"}</div>
                 <div>Sentiment: ${
-                  stock.sentiment && typeof stock.sentiment.score === "number"
-                    ? stock.sentiment.score.toFixed(2)
-                    : "N/A"
+                  score.toFixed(2)
                 } (${
         stock.sentiment && typeof stock.sentiment.sources === "number"
           ? stock.sentiment.sources
