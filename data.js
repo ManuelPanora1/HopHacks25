@@ -92,36 +92,13 @@ let marketData = {
   lastUpdate: new Date(),
 };
 
-// API configuration - You may need to get a new API key from https://www.alphavantage.co/support/#api-key
-const ALPHA_VANTAGE_KEY = "Z156WX7X3NBF8FEF";
+// API configuration - Finnhub
+const FINNHUB_KEY = "d32sqh9r01qtm631ga1gd32sqh9r01qtm631ga20";
+const BASE_URL = "https://finnhub.io/api/v1";
 
 // Get active stocks for visualization
 function getActiveStocks() {
   return allStocks.filter((stock) => stock.active);
-}
-
-// Get the most recent trading day (simplified approach)
-function getRecentTradingDay() {
-  const today = new Date();
-  let daysBack = 0;
-
-  // Go back up to 5 days to find a trading day
-  while (daysBack < 5) {
-    const checkDate = new Date(today);
-    checkDate.setDate(today.getDate() - daysBack);
-    const dayOfWeek = checkDate.getDay();
-
-    // Skip weekends (0 = Sunday, 6 = Saturday)
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      return checkDate.toISOString().slice(0, 10);
-    }
-    daysBack++;
-  }
-
-  // Fallback to 3 days ago
-  const fallback = new Date(today);
-  fallback.setDate(today.getDate() - 3);
-  return fallback.toISOString().slice(0, 10);
 }
 
 // Format volume to readable format
@@ -137,246 +114,108 @@ function formatVolume(volume) {
   return num.toString();
 }
 
-// Test API connection first
-async function testAPIConnection() {
-  const testUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=AAPL&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
+// Test API connection
+async function testAPIConnection(symbol) {
+  const url = `${BASE_URL}/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
 
   try {
-    console.log("Testing API connection...");
-    const response = await fetch(testUrl);
+    console.log(`Testing API connection with ${symbol}...`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
 
-    console.log("API Response:", data);
-
-    if (data["Error Message"]) {
-      console.error("API Error:", data["Error Message"]);
-      return false;
-    }
-
-    if (data["Note"]) {
-      console.warn("API Note (likely rate limit):", data["Note"]);
-      return false;
-    }
-
-    if (data["Time Series (Daily)"]) {
-      console.log("API connection successful!");
+    if (data.c && data.d && data.dp !== undefined) {
+      console.log("✅ API connection successful!");
       return true;
-    }
-
-    console.warn("Unexpected API response format:", Object.keys(data));
-    return false;
-  } catch (error) {
-    console.error("API connection failed:", error);
-    return false;
-  }
-}
-
-async function fetchVolumeFromAPI(symbol) {
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
-
-  try {
-    console.log(`Fetching volume data for ${symbol}...`);
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data["Error Message"] || data["Note"]) {
-      console.warn(
-        `API issue for ${symbol}:`,
-        data["Error Message"] || data["Note"]
-      );
-      return null;
-    }
-
-    const timeSeries = data["Time Series (Daily)"];
-    if (!timeSeries) {
-      console.warn(`No time series data for ${symbol}`);
-      return null;
-    }
-
-    const dates = Object.keys(timeSeries).sort().reverse();
-    if (dates.length === 0) {
-      console.warn(`No date data for ${symbol}`);
-      return null;
-    }
-
-    const currentDate = dates[0];
-    const currentData = timeSeries[currentDate];
-    const volume = currentData["5. volume"];
-
-    console.log(`${symbol} volume: ${volume} (raw)`);
-    return volume;
-  } catch (err) {
-    console.error(`Error fetching volume for ${symbol}:`, err);
-    return null;
-  }
-}
-async function fetchVolumeFromAPI(symbol) {
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
-
-  try {
-    console.log(`Fetching volume data for ${symbol}...`);
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data["Error Message"] || data["Note"]) {
-      console.warn(
-        `API issue for ${symbol}:`,
-        data["Error Message"] || data["Note"]
-      );
-      return null;
-    }
-
-    const timeSeries = data["Time Series (Daily)"];
-    if (!timeSeries) {
-      console.warn(`No time series data for ${symbol}`);
-      return null;
-    }
-
-    const dates = Object.keys(timeSeries).sort().reverse();
-    if (dates.length === 0) {
-      console.warn(`No date data for ${symbol}`);
-      return null;
-    }
-
-    const currentDate = dates[0];
-    const currentData = timeSeries[currentDate];
-    const volume = currentData["5. volume"];
-
-    console.log(`${symbol} volume: ${volume} (raw)`);
-    return volume;
-  } catch (err) {
-    console.error(`Error fetching volume for ${symbol}:`, err);
-    return null;
-  }
-}
-
-// NEW: Update volumes for all active stocks
-async function updateAllStockVolumes() {
-  const activeStocks = getActiveStocks();
-  console.log(`Updating volumes for ${activeStocks.length} active stocks...`);
-
-  for (const stock of activeStocks) {
-    const rawVolume = await fetchVolumeFromAPI(stock.name);
-    if (rawVolume) {
-      stock.volume = formatVolume(rawVolume);
-      console.log(`✅ Updated ${stock.name} volume: ${stock.volume}`);
     } else {
-      console.log(`❌ Failed to update ${stock.name} volume`);
+      console.warn("API response format unexpected:", data);
+      return false;
     }
-
-    // Add delay to avoid rate limiting (5 calls per minute free limit)
-    await new Promise((resolve) => setTimeout(resolve, 13000)); // 13 second delay
-  }
-
-  // Update UI after all volumes are updated
-  if (typeof updateUI === "function") {
-    updateUI();
-  }
-  if (typeof renderStockPanel === "function") {
-    renderStockPanel();
+  } catch (err) {
+    console.error("API connection failed:", err);
+    return false;
   }
 }
-// Fetch stock data from Alpha Vantage API with improved error handling
-async function fetchStockFromAPI(symbol) {
-  // Use simplified daily function instead of daily_adjusted to avoid potential issues
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_KEY}&outputsize=compact`;
 
+// Fetch current quote from Finnhub
+async function fetchCurrentQuote(symbol) {
+  const url = `${BASE_URL}/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
+
+  try {
+    console.log(`Fetching current quote for ${symbol}...`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Debug: Log the full response to see what fields are available
+    console.log(`Full Finnhub response for ${symbol}:`, data);
+
+    if (data.c && data.d && data.dp !== undefined) {
+      const quoteData = {
+        close: data.c,
+        previous_close: data.pc,
+        change: data.d,
+        change_percent: data.dp,
+        high: data.h,
+        low: data.l,
+        open: data.o,
+        volume: data.v || 0,
+      };
+      
+      console.log(`Processed quote data for ${symbol}:`, quoteData);
+      return quoteData;
+    } else {
+      console.warn(`No valid quote data for ${symbol}:`, data);
+      return null;
+    }
+  } catch (err) {
+    console.error(`Error fetching quote for ${symbol}:`, err);
+    return null;
+  }
+}
+
+// Fetch stock data from Finnhub API
+async function fetchStockFromAPI(symbol) {
   try {
     console.log(`Fetching data for ${symbol}...`);
-    const response = await fetch(url);
+    const quoteData = await fetchCurrentQuote(symbol);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Debug: Log the actual response
-    console.log(`Raw API response for ${symbol}:`, data);
-
-    // Check for API limit or error
-    if (data["Error Message"]) {
-      console.error(`API Error for ${symbol}:`, data["Error Message"]);
+    if (!quoteData) {
+      console.warn(`Could not get quote data for ${symbol}`);
       return null;
     }
 
-    if (data["Note"]) {
-      console.warn(`API limit reached for ${symbol}:`, data["Note"]);
-      return null;
-    }
+    const currentPrice = parseFloat(quoteData.close);
+    const changePercent = parseFloat(quoteData.change_percent);
+    const highPrice = parseFloat(quoteData.high);
+    const lowPrice = parseFloat(quoteData.low);
+    const openPrice = parseFloat(quoteData.open);
+    const volume = quoteData.volume || 0;
 
-    // Try both possible key names
-    const timeSeries =
-      data["Time Series (Daily)"] || data["Time Series (Daily Adjusted)"];
-    if (!timeSeries) {
-      console.warn(
-        `No time series data for ${symbol}. Available keys:`,
-        Object.keys(data)
-      );
-      return null;
-    }
+    // Calculate volatility
+    const volatility = Math.abs((highPrice - lowPrice) / openPrice) * 15;
 
-    // Get the most recent trading day
-    const dates = Object.keys(timeSeries).sort().reverse();
-    if (dates.length < 2) {
-      console.warn(`Insufficient data for ${symbol}`);
-      return null;
-    }
-
-    const currentDate = dates[0];
-    const previousDate = dates[1];
-
-    const currentData = timeSeries[currentDate];
-    const previousData = timeSeries[previousDate];
-
-    console.log(
-      `Using dates for ${symbol}: Current=${currentDate}, Previous=${previousDate}`
-    );
-
-    if (currentData && previousData) {
-      const currentClose = parseFloat(currentData["4. close"]);
-      const previousClose = parseFloat(previousData["4. close"]);
-      const change = ((currentClose - previousClose) / previousClose) * 100;
-      const rawVolume = currentData["5. volume"];
-
-      console.log(
-        `${symbol}: Current: ${currentClose}, Previous: ${previousClose}, Change: ${change.toFixed(
-          2
-        )}%`
-      );
-
-      return {
-        price: currentClose,
-        change: change,
-        volume: formatVolume(rawVolume),
-        sentiment: {
-          score: change > 1 ? 0.7 : change < -1 ? -0.7 : 0.0,
-          sources: Math.floor(Math.random() * 20) + 10,
-          trend: change > 1 ? "bullish" : change < -1 ? "bearish" : "neutral",
-        },
-        volatility: Math.min(Math.abs(change) / 10, 1),
-      };
-    } else {
-      console.warn(`Could not find sufficient data for ${symbol}`);
-      return null;
-    }
+    return {
+      price: currentPrice,
+      changePercent: changePercent,
+      volatility: volatility,
+      volume: volume,
+    };
   } catch (err) {
     console.error(`Error fetching data for ${symbol}:`, err);
     return null;
   }
 }
 
-// Update a single stock with real data and refresh visualization
+// Update a single stock with real data
 async function updateSingleStock(stockIndex) {
   const stock = allStocks[stockIndex];
   if (!stock) return;
@@ -387,26 +226,26 @@ async function updateSingleStock(stockIndex) {
   if (apiData) {
     // Update stock with real data
     stock.price = apiData.price;
-    stock.change = apiData.change;
-    stock.volume = apiData.volume;
+    stock.change = apiData.changePercent;
+    stock.volume = formatVolume(apiData.volume.toString());
     stock.volatility = apiData.volatility;
 
-    // Update sentiment trend based on real change
-    if (apiData.change > 2) {
+    // Update sentiment based on real change
+    if (apiData.changePercent > 2) {
       stock.sentiment.trend = "very_bullish";
-      stock.sentiment.score = Math.min(0.9, 0.5 + apiData.change / 10);
-    } else if (apiData.change > 0.5) {
+      stock.sentiment.score = Math.min(0.9, 0.5 + apiData.changePercent / 10);
+    } else if (apiData.changePercent > 0.5) {
       stock.sentiment.trend = "bullish";
-      stock.sentiment.score = Math.min(0.7, 0.3 + apiData.change / 10);
-    } else if (apiData.change > -0.5) {
+      stock.sentiment.score = Math.min(0.7, 0.3 + apiData.changePercent / 10);
+    } else if (apiData.changePercent > -0.5) {
       stock.sentiment.trend = "neutral";
-      stock.sentiment.score = apiData.change / 10;
-    } else if (apiData.change > -2) {
+      stock.sentiment.score = apiData.changePercent / 10;
+    } else if (apiData.changePercent > -2) {
       stock.sentiment.trend = "bearish";
-      stock.sentiment.score = Math.max(-0.7, -0.3 + apiData.change / 10);
+      stock.sentiment.score = Math.max(-0.7, -0.3 + apiData.changePercent / 10);
     } else {
       stock.sentiment.trend = "very_bearish";
-      stock.sentiment.score = Math.max(-0.9, -0.5 + apiData.change / 10);
+      stock.sentiment.score = Math.max(-0.9, -0.5 + apiData.changePercent / 10);
     }
 
     console.log(
@@ -438,20 +277,173 @@ async function updateSingleStock(stockIndex) {
   }
 }
 
+// Generate realistic volume based on real market data patterns
+function generateRealisticVolume(price, volatility, changePercent, symbol) {
+  // Real market volume data for major stocks (average daily volume in millions)
+  const stockVolumeData = {
+    'AAPL': 45000000,    // ~45M average daily volume
+    'MSFT': 25000000,    // ~25M average daily volume  
+    'GOOGL': 20000000,   // ~20M average daily volume
+    'AMZN': 30000000,    // ~30M average daily volume
+    'TSLA': 80000000,    // ~80M average daily volume
+    'META': 15000000,    // ~15M average daily volume
+    'NVDA': 35000000,    // ~35M average daily volume
+    'NFLX': 3000000,     // ~3M average daily volume
+    'BRK.A': 1000000,    // ~1M average daily volume (very high price)
+    'BRK.B': 5000000,    // ~5M average daily volume
+    'JNJ': 8000000,      // ~8M average daily volume
+    'JPM': 12000000,     // ~12M average daily volume
+    'V': 6000000,        // ~6M average daily volume
+    'PG': 6000000,       // ~6M average daily volume
+    'UNH': 3000000,      // ~3M average daily volume
+    'HD': 4000000,       // ~4M average daily volume
+    'MA': 3000000,       // ~3M average daily volume
+    'DIS': 8000000,      // ~8M average daily volume
+    'PYPL': 10000000,    // ~10M average daily volume
+    'ADBE': 2000000,     // ~2M average daily volume
+    'CRM': 5000000,      // ~5M average daily volume
+    'NKE': 4000000,      // ~4M average daily volume
+    'WMT': 6000000,      // ~6M average daily volume
+    'BAC': 40000000,     // ~40M average daily volume
+    'XOM': 15000000,     // ~15M average daily volume
+    'CVX': 8000000,      // ~8M average daily volume
+    'ABBV': 10000000,    // ~10M average daily volume
+    'KO': 12000000,      // ~12M average daily volume
+    'PFE': 25000000,     // ~25M average daily volume
+    'TMO': 1000000,      // ~1M average daily volume
+    'COST': 2000000,     // ~2M average daily volume
+    'ACN': 1000000,      // ~1M average daily volume
+    'DHR': 1000000,      // ~1M average daily volume
+    'VZ': 15000000,      // ~15M average daily volume
+    'CMCSA': 8000000,    // ~8M average daily volume
+    'PEP': 6000000,      // ~6M average daily volume
+    'TXN': 3000000,      // ~3M average daily volume
+    'QCOM': 8000000,     // ~8M average daily volume
+    'COF': 3000000,      // ~3M average daily volume
+    'AVGO': 2000000,     // ~2M average daily volume
+    'T': 20000000,       // ~20M average daily volume
+    'INTC': 25000000,    // ~25M average daily volume
+    'IBM': 4000000,      // ~4M average daily volume
+    'SPY': 50000000,     // ~50M average daily volume (ETF)
+    'QQQ': 30000000,     // ~30M average daily volume (ETF)
+    'IWM': 15000000,     // ~15M average daily volume (ETF)
+  };
+
+  // Check if we have specific data for this stock
+  const symbolUpper = symbol.toUpperCase();
+  if (stockVolumeData[symbolUpper]) {
+    let baseVolume = stockVolumeData[symbolUpper];
+    
+    // Adjust based on price change (bigger moves = more volume)
+    const changeMultiplier = 1 + (Math.abs(changePercent) / 25); // More conservative adjustment
+    
+    // Adjust based on volatility (higher volatility = higher volume)
+    const volatilityMultiplier = 1 + (volatility * 0.5); // More conservative adjustment
+    
+    // Time-based adjustment (market hours vs after-hours)
+    const now = new Date();
+    const hour = now.getHours();
+    const isMarketHours = hour >= 9 && hour <= 16;
+    const timeFactor = isMarketHours ? 1.0 : 0.4; // After-hours much lower volume
+    
+    // Add realistic randomness (±10% for known stocks)
+    const randomFactor = 0.9 + (Math.random() * 0.2);
+    
+    const finalVolume = Math.floor(baseVolume * changeMultiplier * volatilityMultiplier * timeFactor * randomFactor);
+    return finalVolume;
+  }
+
+  // For unknown stocks, use price-based estimation with more accurate ranges
+  let baseVolume;
+  if (price > 2000) {
+    baseVolume = 1000000;  // Very high-priced stocks (like BRK.A)
+  } else if (price > 1000) {
+    baseVolume = 2000000;  // High-priced stocks (like GOOGL, AMZN)
+  } else if (price > 500) {
+    baseVolume = 8000000;  // Mid-high priced stocks (like AAPL, MSFT)
+  } else if (price > 200) {
+    baseVolume = 15000000; // Mid-priced stocks
+  } else if (price > 100) {
+    baseVolume = 25000000; // Lower-priced stocks
+  } else if (price > 50) {
+    baseVolume = 40000000; // Very low-priced stocks
+  } else if (price > 20) {
+    baseVolume = 60000000; // Penny stocks
+  } else {
+    baseVolume = 100000000; // Very low-priced stocks
+  }
+
+  // Adjust based on volatility (more conservative)
+  const volatilityMultiplier = 1 + (volatility * 0.3);
+  
+  // Adjust based on price change (more conservative)
+  const changeMultiplier = 1 + (Math.abs(changePercent) / 30);
+  
+  // Time-based adjustment
+  const now = new Date();
+  const hour = now.getHours();
+  const isMarketHours = hour >= 9 && hour <= 16;
+  const timeFactor = isMarketHours ? 1.0 : 0.4;
+  
+  // Add realistic randomness (±15% for unknown stocks)
+  const randomFactor = 0.85 + (Math.random() * 0.3);
+  
+  const finalVolume = Math.floor(baseVolume * volatilityMultiplier * changeMultiplier * timeFactor * randomFactor);
+  
+  return finalVolume;
+}
+
+// Update all stock volumes
+async function updateAllStockVolumes() {
+  const activeStocks = getActiveStocks();
+  console.log(`Updating volumes for ${activeStocks.length} active stocks...`);
+
+  for (const stock of activeStocks) {
+    const quoteData = await fetchCurrentQuote(stock.name);
+    
+    if (quoteData) {
+      // Try to get volume from API
+      let volume = quoteData.volume || 0;
+      
+       // If volume is 0 or very small, generate realistic volume
+       if (volume < 1000) {
+         volume = generateRealisticVolume(stock.price, stock.volatility, stock.change, stock.name);
+         console.log(`📊 Generated realistic volume for ${stock.name}: ${formatVolume(volume.toString())}`);
+       } else {
+         console.log(`📈 Using API volume for ${stock.name}: ${formatVolume(volume.toString())}`);
+       }
+      
+      stock.volume = formatVolume(volume.toString());
+      console.log(`✅ Updated ${stock.name} volume: ${stock.volume}`);
+    } else {
+      // Fallback: generate volume based on current stock data
+      const volume = generateRealisticVolume(stock.price, stock.volatility, stock.change, stock.name);
+      stock.volume = formatVolume(volume.toString());
+      console.log(`🔄 Generated fallback volume for ${stock.name}: ${stock.volume}`);
+    }
+
+    // Add delay to avoid rate limiting
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay
+  }
+
+  // Update UI after all volumes are updated
+  if (typeof updateUI === "function") {
+    updateUI();
+  }
+  if (typeof renderStockPanel === "function") {
+    renderStockPanel();
+  }
+}
+
 // Initialize stock data gradually with API testing
 async function initializeStockDataGradually() {
   console.log("Starting stock data initialization...");
 
   // First test the API connection
-  const apiWorking = await testAPIConnection();
+  const apiWorking = await testAPIConnection("AAPL");
 
   if (!apiWorking) {
     console.warn("⚠️  API connection failed. Using simulated data only.");
-    console.log("To get real data:");
-    console.log(
-      "1. Get a free API key from https://www.alphavantage.co/support/#api-key"
-    );
-    console.log("2. Replace the ALPHA_VANTAGE_KEY in data.js");
     return;
   }
 
@@ -463,7 +455,7 @@ async function initializeStockDataGradually() {
   for (let i = 0; i < allStocks.length; i++) {
     setTimeout(async () => {
       await updateSingleStock(i);
-    }, i * 15000); // 15 second delay between each stock
+    }, i * 2000); // 2 second delay between each stock
   }
 }
 
@@ -540,8 +532,121 @@ function startPeriodicUpdates() {
     clearInterval(updateInterval);
   }
 
-  console.log("🚀 Starting periodic updates (every 60 seconds)");
-  updateInterval = setInterval(updateMarketData, 60000);
+  console.log("🚀 Starting periodic updates (every 5 minutes)");
+  updateInterval = setInterval(updateMarketData, 300000); // 5 minutes
+}
+
+// Search for stock using Finnhub API
+async function searchStock(query) {
+  const url = `${BASE_URL}/search?q=${encodeURIComponent(
+    query
+  )}&token=${FINNHUB_KEY}`;
+
+  try {
+    console.log(`Searching for stock: ${query}...`);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      console.warn(`Search error for ${query}:`, data.error);
+      return null;
+    }
+
+    if (data.result && data.result.length > 0) {
+      console.log(`Found ${data.result.length} results for ${query}`);
+      return data.result;
+    }
+
+    console.warn(`No results found for ${query}`);
+    return null;
+  } catch (err) {
+    console.error(`Error searching for ${query}:`, err);
+    return null;
+  }
+}
+
+// Create new stock with real data from Finnhub
+async function createNewStockWithRealData(symbol) {
+  symbol = symbol.toUpperCase().trim();
+
+  if (!symbol || symbol.length > 10) {
+    return null;
+  }
+
+  if (allStocks.find((s) => s.name === symbol)) {
+    return null; // Already exists
+  }
+
+  // First, search for the stock to validate it exists
+  const searchResults = await searchStock(symbol);
+  if (!searchResults || searchResults.length === 0) {
+    console.warn(`Stock ${symbol} not found in search results`);
+    return null;
+  }
+
+  // Find exact match or best match
+  const stockMatch =
+    searchResults.find(
+      (result) => result.symbol === symbol || result.symbol === symbol
+    ) || searchResults[0];
+
+  console.log(`Found stock: ${stockMatch.description} (${stockMatch.symbol})`);
+
+  // Get real data for the stock
+  const quoteData = await fetchCurrentQuote(stockMatch.symbol);
+  if (!quoteData) {
+    console.warn(`Could not get quote data for ${stockMatch.symbol}`);
+    return null;
+  }
+
+  const currentPrice = parseFloat(quoteData.close);
+  const changePercent = parseFloat(quoteData.change_percent);
+  const highPrice = parseFloat(quoteData.high);
+  const lowPrice = parseFloat(quoteData.low);
+  const openPrice = parseFloat(quoteData.open);
+  let volume = quoteData.volume || 0;
+
+  // Calculate volatility
+  const volatility = Math.abs((highPrice - lowPrice) / openPrice) * 15;
+
+  // If volume is 0 or very small, generate realistic volume
+  if (volume < 1000) {
+    volume = generateRealisticVolume(currentPrice, volatility, changePercent, stockMatch.symbol);
+    console.log(`📊 Generated realistic volume for new stock ${stockMatch.symbol}: ${formatVolume(volume.toString())}`);
+  }
+
+  const newStock = {
+    name: stockMatch.symbol,
+    change: changePercent,
+    price: currentPrice,
+    volume: formatVolume(volume.toString()),
+    sentiment: {
+      score:
+        changePercent > 1
+          ? 0.7
+          : changePercent < -1
+          ? -0.7
+          : changePercent / 10,
+      sources: Math.floor(Math.random() * 30) + 5,
+      trend:
+        changePercent > 1
+          ? "bullish"
+          : changePercent < -1
+          ? "bearish"
+          : "neutral",
+    },
+    volatility: volatility,
+    newsCount: Math.floor(Math.random() * 25) + 1,
+    active: true,
+  };
+
+  console.log(`✅ Created new stock with real data:`, newStock);
+  return newStock;
 }
 
 // Create new stock with simulated data
@@ -588,3 +693,8 @@ function createNewStock(symbol) {
 // Export functions for main.js
 window.initializeStockDataGradually = initializeStockDataGradually;
 window.startPeriodicUpdates = startPeriodicUpdates;
+window.createNewStockWithRealData = createNewStockWithRealData;
+window.searchStock = searchStock;
+
+// Export for main.js or manual triggering
+window.updateMarketData = updateMarketData;

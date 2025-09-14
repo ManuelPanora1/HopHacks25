@@ -55,7 +55,6 @@ function initThreeJS() {
 function createHolographicSphere(stock, index) {
   const score = stock.sentiment && typeof stock.sentiment.score === "number" ? stock.sentiment.score : 0;
   const baseColor = getSentimentColor(score);
-  console.log(`🔵 Sphere ${index} (${stock.name}): sentiment = ${score.toFixed(3)}, color = rgb(${baseColor.r.toFixed(3)}, ${baseColor.g.toFixed(3)}, ${baseColor.b.toFixed(3)})`);
   
   // Create sphere geometry (smaller radius)
   const sphereGeometry = new THREE.SphereGeometry(5, 32, 32);
@@ -197,7 +196,6 @@ function getSentimentColor(score) {
   // Clamp score to -1 to 1 range
   const clampedScore = Math.max(-1, Math.min(1, score));
   
-  console.log(`🎨 getSentimentColor called with score: ${score}, clamped: ${clampedScore}`);
   
   // Gradient color mapping: closer to 0 = whiter, further from 0 = more saturated
   const intensity = Math.abs(clampedScore); // 0 to 1 (distance from 0)
@@ -207,18 +205,15 @@ function getSentimentColor(score) {
     const r = 1; // Always full red
     const g = 1 - intensity; // More white when closer to 0
     const b = 1 - intensity; // More white when closer to 0
-    console.log(`🔴 RED GRADIENT: intensity=${intensity.toFixed(3)}, rgb(${r}, ${g.toFixed(3)}, ${b.toFixed(3)})`);
     return new THREE.Color(r, g, b);
   } else if (clampedScore > 0) {
     // Positive sentiment: GREEN gradient (closer to 0 = whiter)
     const r = 1 - intensity; // More white when closer to 0
     const g = 1; // Always full green
     const b = 1 - intensity; // More white when closer to 0
-    console.log(`🟢 GREEN GRADIENT: intensity=${intensity.toFixed(3)}, rgb(${r.toFixed(3)}, ${g}, ${b.toFixed(3)})`);
     return new THREE.Color(r, g, b);
   } else {
     // Zero sentiment: WHITE
-    console.log(`⚪ WHITE: zero sentiment`);
     return new THREE.Color(1, 1, 1); // White
   }
 }
@@ -245,7 +240,6 @@ function createStockCluster(stock, index) {
       : 0;
   
   const baseColor = getSentimentColor(score);
-  console.log(`🔴 Particles ${index} (${stock.name}): sentiment = ${score.toFixed(3)}, color = rgb(${baseColor.r.toFixed(3)}, ${baseColor.g.toFixed(3)}, ${baseColor.b.toFixed(3)})`);
 
   for (let j = 0; j < particleCount; j++) {
     const i3 = j * 3;
