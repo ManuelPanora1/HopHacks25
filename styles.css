@@ -53,13 +53,6 @@
   }
   #stockPanel.open {
     right: 0;
-    z-index: 9999;
-  }
-  #dataPanel {
-    z-index: 9000;
-  }
-  #stockPanel.open ~ #toggleDataPanel {
-    display: none !important;
   }
   .panel-header {
     font-size: 15px;
