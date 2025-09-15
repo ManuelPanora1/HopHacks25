@@ -95,7 +95,7 @@ function renderStockPanel() {
   const stockList = document.getElementById("stockList");
   stockList.innerHTML = "";
 
-  allStocks.forEach((stock) => {
+  allStocks.forEach((stock, idx) => {
     const stockItem = document.createElement("div");
     stockItem.className = `stock-item ${stock.active ? "active" : ""}`;
 
@@ -138,12 +138,27 @@ function renderStockPanel() {
     )}</span>
                 </div>
             </div>
-            <div class="stock-toggle ${
-              stock.active ? "checked" : ""
-            }" data-symbol="${stock.name}"></div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+              <div class="stock-toggle ${
+                stock.active ? "checked" : ""
+              }" data-symbol="${stock.name}"></div>
+              <button class="delete-stock-btn" data-index="${idx}" title="Remove stock" aria-label="Remove stock"></button>
+            </div>
         `;
 
     stockList.appendChild(stockItem);
+  });
+  // Add event listeners to delete buttons
+  document.querySelectorAll(".delete-stock-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      const idx = parseInt(this.getAttribute("data-index"));
+      if (!isNaN(idx)) {
+        allStocks.splice(idx, 1);
+        renderStockPanel();
+        recreateVisualization();
+        updateUI();
+      }
+    });
   });
 
   // Add event listeners to toggles
@@ -171,39 +186,38 @@ function renderStockPanel() {
 // Add new stock to the system with real data from Finnhub
 async function addNewStock(symbol) {
   // Show loading state
-  const addBtn = document.getElementById('addStockBtn');
+  const addBtn = document.getElementById("addStockBtn");
   const originalText = addBtn.textContent;
-  addBtn.textContent = 'Searching...';
+  addBtn.textContent = "Searching...";
   addBtn.disabled = true;
-  
+
   try {
     const newStock = await createNewStockWithRealData(symbol);
-    
+
     if (!newStock) {
       if (!symbol || symbol.length > 10) {
-        alert('Please enter a valid stock symbol (1-10 characters)');
+        alert("Please enter a valid stock symbol (1-10 characters)");
       } else {
-        alert('Stock not found or already exists in the list');
+        alert("Stock not found or already exists in the list");
       }
       return;
     }
-    
+
     allStocks.push(newStock);
     renderStockPanel();
-    
+
     // Update visualization
     recreateVisualization();
     updateUI();
-    
+
     // Clear input
-    document.getElementById('newStockSymbol').value = '';
-    
+    document.getElementById("newStockSymbol").value = "";
+
     // Show success message
     console.log(`✅ Successfully added ${newStock.name} with real market data`);
-    
   } catch (error) {
-    console.error('Error adding stock:', error);
-    alert('Error adding stock. Please try again.');
+    console.error("Error adding stock:", error);
+    alert("Error adding stock. Please try again.");
   } finally {
     // Reset button state
     addBtn.textContent = originalText;
