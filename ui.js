@@ -142,7 +142,7 @@ function renderStockPanel() {
               <div class="stock-toggle ${
                 stock.active ? "checked" : ""
               }" data-symbol="${stock.name}"></div>
-              <button class="delete-stock-btn" data-index="${idx}" style="background: #ff4400; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Delete</button>
+              <button class="delete-stock-btn" data-index="${idx}" style="width: 20px; height: 20px; background: #ff4400; color: white; border: 2px solid #ff4400; border-radius: 4px; padding: 0; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&#10005;</button>
             </div>
         `;
 
