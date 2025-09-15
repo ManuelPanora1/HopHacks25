@@ -249,6 +249,7 @@ function setupPanelControls() {
   const newStockInput = document.getElementById("newStockSymbol");
   const selectAllBtn = document.getElementById("selectAllBtn");
   const deselectAllBtn = document.getElementById("deselectAllBtn");
+  const closeBtn = document.getElementById("closeStockPanel");
 
   const dataPanel = document.getElementById("dataPanel");
   const toggleDataBtn = document.getElementById("toggleDataPanel");
@@ -256,6 +257,11 @@ function setupPanelControls() {
   // Toggle stock panel
   toggleBtn.addEventListener("click", function () {
     panel.classList.toggle("open");
+  });
+
+  // Close stock panel (mobile and desktop)
+  closeBtn.addEventListener("click", function () {
+    panel.classList.remove("open");
   });
 
   // Toggle data panel
