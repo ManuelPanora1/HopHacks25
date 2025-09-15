@@ -142,23 +142,11 @@ function renderStockPanel() {
               <div class="stock-toggle ${
                 stock.active ? "checked" : ""
               }" data-symbol="${stock.name}"></div>
-              <button class="delete-stock-btn" data-index="${idx}" title="Remove stock" aria-label="Remove stock"></button>
+              <button class="delete-stock-btn" data-index="${idx}" style="background: #ff4400; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Delete</button>
             </div>
         `;
 
     stockList.appendChild(stockItem);
-  });
-  // Add event listeners to delete buttons
-  document.querySelectorAll(".delete-stock-btn").forEach((btn) => {
-    btn.addEventListener("click", function () {
-      const idx = parseInt(this.getAttribute("data-index"));
-      if (!isNaN(idx)) {
-        allStocks.splice(idx, 1);
-        renderStockPanel();
-        recreateVisualization();
-        updateUI();
-      }
-    });
   });
 
   // Add event listeners to toggles
@@ -177,6 +165,19 @@ function renderStockPanel() {
         } else {
           clearVisualization();
         }
+        updateUI();
+      }
+    });
+  });
+
+  // Add event listeners to delete buttons
+  document.querySelectorAll(".delete-stock-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      const idx = parseInt(this.getAttribute("data-index"));
+      if (!isNaN(idx)) {
+        allStocks.splice(idx, 1);
+        renderStockPanel();
+        recreateVisualization();
         updateUI();
       }
     });
@@ -249,7 +250,6 @@ function setupPanelControls() {
   const newStockInput = document.getElementById("newStockSymbol");
   const selectAllBtn = document.getElementById("selectAllBtn");
   const deselectAllBtn = document.getElementById("deselectAllBtn");
-  const closeBtn = document.getElementById("closeStockPanel");
 
   const dataPanel = document.getElementById("dataPanel");
   const toggleDataBtn = document.getElementById("toggleDataPanel");
@@ -257,11 +257,6 @@ function setupPanelControls() {
   // Toggle stock panel
   toggleBtn.addEventListener("click", function () {
     panel.classList.toggle("open");
-  });
-
-  // Close stock panel (mobile and desktop)
-  closeBtn.addEventListener("click", function () {
-    panel.classList.remove("open");
   });
 
   // Toggle data panel
